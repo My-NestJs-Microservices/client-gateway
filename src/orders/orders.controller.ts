@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Patch, Param, Inject, Query, ParseUUIDPipe } from '@nestjs/common';
 import { ORDER_SERVICE } from 'src/config';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
-import { catchError } from 'rxjs';
+import { catchError, firstValueFrom } from 'rxjs';
 import { CreateOrderDto, OrderPaginationDto, StatusDto } from './dto';
 import { OrderStatus } from './enum/order.enum';
 import { PaginationDto } from 'src/common';
@@ -11,22 +11,25 @@ import { PaginationDto } from 'src/common';
 export class OrdersController {
 
   constructor(
-    @Inject(ORDER_SERVICE) private readonly client: ClientProxy,
+    @Inject(ORDER_SERVICE) private readonly orderClient: ClientProxy,
   ) { }
 
 
   @Post()
-  createOrder(@Body() createOrderDto: CreateOrderDto) {
-    return this.client.send('createOrder', createOrderDto)
-      .pipe(
-        catchError(error => { throw new RpcException(error) })
-      )
+  async createOrder(@Body() createOrderDto: CreateOrderDto) {
+    try {
+      const a = await firstValueFrom(this.orderClient.send('createOrder', createOrderDto))
+      return a
+    } catch (error) {
+      throw new RpcException(error)
+    }
+
   }
 
 
   @Get()
   findAllOrders(@Query() orderPaginationDto: OrderPaginationDto) {
-    return this.client.send('findAllOrders', orderPaginationDto)
+    return this.orderClient.send('findAllOrders', orderPaginationDto)
       .pipe(
         catchError(error => { throw new RpcException(error) })
       )
@@ -34,7 +37,7 @@ export class OrdersController {
 
   @Get(':status')
   async findAllByStatus(@Param() statusDto: StatusDto, @Query() paginationDto: PaginationDto) {
-    return this.client.send('findAllOrders', { ...paginationDto, status: statusDto.status })
+    return this.orderClient.send('findAllOrders', { ...paginationDto, status: statusDto.status })
       .pipe(
         catchError(error => { throw new RpcException(error) })
       )
@@ -43,7 +46,7 @@ export class OrdersController {
 
   @Get('id/:id')
   async findOrderById(@Param('id', ParseUUIDPipe) id: string) {
-    return this.client.send('findOneOrderById', { id })
+    return this.orderClient.send('findOneOrderById', { id })
       .pipe(
         catchError(error => { throw new RpcException(error) })
       )
@@ -54,7 +57,7 @@ export class OrdersController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() statusDto: StatusDto
   ) {
-    return this.client.send('changeOrderStatus', { ...statusDto, id })
+    return this.orderClient.send('changeOrderStatus', { ...statusDto, id })
       .pipe(
         catchError(error => { throw new RpcException(error) })
       )
